@@ -3,19 +3,48 @@ import { SignInButton, useUser } from "@clerk/nextjs";
 
 import { type NextPage } from "next";
 
-import { type RouterOutputs, api } from "~/utils/api";
+import { type RouterOutputs } from "~/utils/api";
+import { api } from "~/utils/api";
 
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import Image from "next/image";
 import { LoadingPage } from "../components/loading";
+import { useRef, useState } from "react";
 
 dayjs.extend(relativeTime);
 
+const TopBanner = ({ message }: { message: string }) => {
+  return (
+    <div className="absolute left-0 top-0 flex h-[100px] w-full items-center justify-center bg-red-100/90 text-slate-800 transition delay-300 ease-in-out">
+      {message}
+    </div>
+  );
+};
+
 const CreatePostWizard = () => {
   const { user } = useUser();
+  const [input, setInput] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const ref = useRef<HTMLInputElement | null>(null);
+  const ctx = api.useContext();
 
-  console.log(user);
+  const { mutate, isLoading: isPosting } = api.posts.create.useMutation({
+    onSuccess: () => {
+      setInput("");
+      void ctx.posts.getAll.invalidate();
+    },
+    onError: (err) => {
+      if (err.data?.zodError?.fieldErrors.content) {
+        setError(
+          err.data.zodError.fieldErrors.content[0] ?? "Something went wrong"
+        );
+      }
+      setTimeout(() => {
+        setError(null);
+      }, 3000);
+    },
+  });
 
   if (!user) return null;
 
@@ -29,9 +58,19 @@ const CreatePostWizard = () => {
         height={56}
       />
       <input
+        ref={ref}
         placeholder="Type some emojis!"
         className="grow bg-transparent outline-none"
+        type="text"
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && mutate({ content: input })}
+        disabled={isPosting}
       />
+      <button onClick={() => mutate({ content: input })} disabled={isPosting}>
+        Post
+      </button>
+      {error && <TopBanner message={error} />}
     </div>
   );
 };
@@ -55,7 +94,7 @@ const PostView = (props: PostWithUser) => {
           <span className="font-thin">{dayjs(post.createdAt).fromNow()}</span>
         </div>
 
-        <span>{post.content}</span>
+        <span className="text-2xl">{post.content}</span>
       </div>
     </div>
   );
@@ -69,7 +108,7 @@ const Feed = () => {
 
   return (
     <div className={"flex flex-col"}>
-      {[...data, ...data]?.map((fullPost) => (
+      {data?.map((fullPost) => (
         <PostView key={fullPost.post.id} {...fullPost} />
       ))}
     </div>
@@ -78,7 +117,6 @@ const Feed = () => {
 
 const Home: NextPage = () => {
   const { isLoaded: userLoaded, isSignedIn } = useUser();
-  const { data } = api.posts.getAll.useQuery();
 
   // Return empty div if BOTH aren't loaded, since user tends to load faster
   if (!userLoaded) return <div />;
@@ -91,7 +129,7 @@ const Home: NextPage = () => {
 
         <link rel="icon" href="/favicon.ico" />
       </Head>
-      <main className={"flex h-screen justify-center"}>
+      <main className={"flex justify-center"}>
         <div className={"w-full border-x border-slate-400 md:max-w-2xl"}>
           <div className={"flex border-b border-slate-400 p-4"}>
             {!isSignedIn && (
