@@ -9,40 +9,30 @@ import { api } from "~/utils/api";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import Image from "next/image";
-import { LoadingPage } from "../components/loading";
+import { LoadingPage, LoadingSpinner } from "../components/loading";
 import { useRef, useState } from "react";
+import { toast } from "react-hot-toast";
+import Link from "next/link";
 
 dayjs.extend(relativeTime);
-
-const TopBanner = ({ message }: { message: string }) => {
-  return (
-    <div className="absolute left-0 top-0 flex h-[100px] w-full items-center justify-center bg-red-100/90 text-slate-800 transition delay-300 ease-in-out">
-      {message}
-    </div>
-  );
-};
 
 const CreatePostWizard = () => {
   const { user } = useUser();
   const [input, setInput] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const ref = useRef<HTMLInputElement | null>(null);
-  const ctx = api.useContext();
 
+  const ctx = api.useContext();
   const { mutate, isLoading: isPosting } = api.posts.create.useMutation({
     onSuccess: () => {
-      setInput("");
       void ctx.posts.getAll.invalidate();
+      setInput("");
     },
     onError: (err) => {
-      if (err.data?.zodError?.fieldErrors.content) {
-        setError(
-          err.data.zodError.fieldErrors.content[0] ?? "Something went wrong"
-        );
-      }
-      setTimeout(() => {
-        setError(null);
-      }, 3000);
+      console.log({ err });
+      toast.error(
+        err.data?.zodError?.fieldErrors.content?.[0] ??
+          err.shape?.message ??
+          "Something went wrong."
+      );
     },
   });
 
@@ -58,19 +48,29 @@ const CreatePostWizard = () => {
         height={56}
       />
       <input
-        ref={ref}
         placeholder="Type some emojis!"
         className="grow bg-transparent outline-none"
         type="text"
         value={input}
         onChange={(e) => setInput(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && mutate({ content: input })}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            if (input !== "") {
+              mutate({ content: input });
+            }
+          }
+        }}
         disabled={isPosting}
       />
-      <button onClick={() => mutate({ content: input })} disabled={isPosting}>
-        Post
-      </button>
-      {error && <TopBanner message={error} />}
+      {input !== "" && !isPosting && (
+        <button onClick={() => mutate({ content: input })}>Post</button>
+      )}
+      {isPosting && (
+        <div className="flex items-center justify-center">
+          <LoadingSpinner size={20} />
+        </div>
+      )}
     </div>
   );
 };
@@ -89,9 +89,13 @@ const PostView = (props: PostWithUser) => {
       />
       <div className="flex flex-col">
         <div className="flex gap-1">
-          <span>{`@${author.username}`}</span>
+          <Link href={`/@${author.username}`}>
+            <span>{`@${author.username}`}</span>
+          </Link>
           <span>·</span>
-          <span className="font-thin">{dayjs(post.createdAt).fromNow()}</span>
+          <Link href={`/post/${post.id}`}>
+            <span className="font-thin">{dayjs(post.createdAt).fromNow()}</span>
+          </Link>
         </div>
 
         <span className="text-2xl">{post.content}</span>

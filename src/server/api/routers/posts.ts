@@ -36,12 +36,10 @@ const ratelimit = new Ratelimit({
 export const postsRouter = createTRPCRouter({
   // publicProcedure: generate a query/mutation that is accessible to anyone
   getAll: publicProcedure.query(async ({ ctx }) => {
-    console.log("query starts");
     const posts = await ctx.prisma.post.findMany({
       take: 100,
       orderBy: [{ createdAt: "desc" }],
     });
-    console.log("posts", posts);
 
     const users = (
       await clerkClient.users.getUserList({
@@ -49,8 +47,6 @@ export const postsRouter = createTRPCRouter({
         limit: 100,
       })
     ).map(filterUserForClient);
-
-    console.log("users", users);
 
     return posts.map((post) => {
       const author = users.find((user) => user.id === post.authorId);
@@ -73,19 +69,21 @@ export const postsRouter = createTRPCRouter({
   create: privateProcedure
     .input(
       z.object({
-        content: z.string().emoji().min(1).max(280),
+        content: z.string().emoji("Only emojis are allowed.").min(1).max(280),
       })
     )
     .mutation(async ({ ctx, input }) => {
       const authorId = ctx.userId;
 
-      const { success } = await ratelimit.limit(authorId);
+      const ratelimiter = await ratelimit.limit(authorId);
+      console.log(ratelimiter);
 
-      if (!success)
+      if (!ratelimiter.success) {
         throw new TRPCError({
           code: "TOO_MANY_REQUESTS",
           message: "You are posting too often.",
         });
+      }
 
       const post = await ctx.prisma.post.create({
         data: {
