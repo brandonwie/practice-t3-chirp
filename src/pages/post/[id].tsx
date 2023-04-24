@@ -31,6 +31,7 @@ const SinglePost: NextPage<{ id: string }> = ({ id }) => {
 // } => use SSG
 
 export const getStaticProps: GetStaticProps = async (context) => {
+  // hydrate data ahead of time
   const ssg = generateSSGHelper();
 
   const id = context.params?.id;
@@ -41,6 +42,7 @@ export const getStaticProps: GetStaticProps = async (context) => {
 
   return {
     props: {
+      // dehydrate data
       trpcState: ssg.dehydrate(),
       id,
     },
