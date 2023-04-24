@@ -9,5 +9,3 @@ export const generateSSGHelper = () =>
     ctx: { prisma, userId: null },
     transformer: superjson,
   });
-
-export type GenerateSSGHelper = typeof generateSSGHelper;
