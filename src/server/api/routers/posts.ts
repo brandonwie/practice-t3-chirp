@@ -85,6 +85,7 @@ export const postsRouter = createTRPCRouter({
           where: {
             authorId: input.userId,
           },
+          // TODO pagination using infinite query
           take: 100,
           orderBy: [{ createdAt: "desc" }],
         })
